@@ -1,3 +1,28 @@
+# macOS
 .DS_Store
-node_modules/
+.AppleDouble
+.LSOverride
+Icon?
+
+# 编辑器 / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 日志与临时文件
+*.log
+*.tmp
+tmp/
+
+# 本地环境配置
 .env
+.env.local
+.env.*.local
+
+# 依赖与构建产物（如以后引入 npm/打包工具）
+node_modules/
+dist/
+build/
+.cache/

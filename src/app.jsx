@@ -288,6 +288,7 @@ function App() {
           onSaveDraft={handleSaveDraft}
           onClear={handleClear}
           onBack={() => { handleSaveDraft(); setRoute('home'); }}
+          onOpenSong={handleOpenSong}
           toast={toast}
         />
       );

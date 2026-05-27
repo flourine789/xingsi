@@ -1,6 +1,6 @@
 /* screen-write.jsx — A2 书写页 ------------------------------ */
 
-window.ScreenWrite = function({ essay, onChange, onMatch, onSaveDraft, onClear, onBack, toast, cards }) {
+window.ScreenWrite = function({ essay, onChange, onMatch, onSaveDraft, onClear, onBack, onOpenSong, toast, cards }) {
   const wordCount = window.countChars(essay.content);
   const meetsMin = wordCount >= 20;
   const tooLong = wordCount > 3000;
@@ -36,6 +36,14 @@ window.ScreenWrite = function({ essay, onChange, onMatch, onSaveDraft, onClear, 
     onMatch();
   };
 
+  const handleSong = () => {
+    if (!meetsMin) { toast('再多写一点，让歌词更准'); return; }
+    if (tooLong)   { toast('这段思考很长，先截取一段开始吧'); return; }
+    const safe = window.simpleSafetyCheck(essay.content);
+    if (!safe.ok) { toast(safe.reason); return; }
+    onOpenSong && onOpenSong();
+  };
+
   // 本随笔相关的灵感卡片
   const essayCards = (cards || []).filter(c => c.essay_id === essay.id);
 
@@ -68,6 +76,12 @@ window.ScreenWrite = function({ essay, onChange, onMatch, onSaveDraft, onClear, 
                     disabled={!meetsMin || tooLong}
                     onClick={handleMatch}>
               寻找共鸣
+            </button>
+            <button className="btn btn-block"
+                    disabled={!meetsMin || tooLong}
+                    onClick={handleSong}
+                    title="把这段念头交给 AI 谱成一首歌">
+              ♪ 做成一首歌
             </button>
             <button className="btn btn-block" onClick={() => { onSaveDraft(); toast('草稿已保存'); }}>
               保存为草稿

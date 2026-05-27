@@ -57,10 +57,10 @@ window.IntroCard = function({ open, onClose }) {
             <article className="intro-article intro-article-design">
               <h2>llm结构</h2>
               <p className="intro-design-lead">
-                行思把<strong>"理解"</strong>和<strong>"扮演"</strong>分给两个模型
+                行思把<strong>"理解"</strong>、<strong>"扮演"</strong>与<strong>"谱曲"</strong>分给三个模型
               </p>
 
-              <svg className="design-diagram" viewBox="0 0 720 920" preserveAspectRatio="xMidYMin meet">
+              <svg className="design-diagram" viewBox="0 0 720 1300" preserveAspectRatio="xMidYMin meet">
                 <defs>
                   <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
                     <path d="M0,0 L10,5 L0,10 z" fill="var(--ink-mute)" />
@@ -140,9 +140,38 @@ window.IntroCard = function({ open, onClose }) {
                   <text x="360" y="848" textAnchor="middle" className="dg-output">生成灵感卡片，继续写作</text>
                 </g>
 
+                {/* 分支：从星图也可走向写歌 */}
+                <line x1="600" y1="450" x2="660" y2="450" stroke="var(--cinnabar)" strokeWidth="1.2" strokeDasharray="3 3" />
+                <line x1="660" y1="450" x2="660" y2="950" stroke="var(--cinnabar)" strokeWidth="1.2" strokeDasharray="3 3" />
+                <line x1="660" y1="950" x2="600" y2="950" stroke="var(--cinnabar)" strokeWidth="1.2" strokeDasharray="3 3" markerEnd="url(#arrow-red)" />
+                <text x="668" y="700" className="dg-action" transform="rotate(90 668 700)">♪ 做成一首歌</text>
+
+                {/* LLM3 box */}
+                <g>
+                  <rect x="120" y="905" width="480" height="180" rx="10" fill="var(--paper-soft)" stroke="#8a6a3c" strokeWidth="2" />
+                  <rect x="120" y="905" width="480" height="34" rx="10 10 0 0" fill="#8a6a3c" />
+                  <text x="360" y="928" textAnchor="middle" className="dg-llm-title">LLM3 · 谱曲引擎</text>
+
+                  <text x="150" y="970" className="dg-bullet">① 凝练  · 把念头化为可吟唱的诗句</text>
+                  <text x="150" y="1000" className="dg-bullet">② 写歌词  · [Verse] [Chorus] 等结构标签，\n 分行</text>
+                  <text x="150" y="1030" className="dg-bullet">③ 风格 prompt  · 英文 2–4 词，定调情绪与乐器</text>
+                  <text x="150" y="1060" className="dg-bullet">④ 调 MiniMax music-2.6  · 生成一段 mp3</text>
+                </g>
+
+                <line x1="360" y1="1085" x2="360" y2="1130" stroke="var(--ink-mute)" strokeWidth="1.5" markerEnd="url(#arrow)" />
+
+                {/* 输出：歌曲 */}
+                <g>
+                  <rect x="240" y="1135" width="240" height="56" rx="28" fill="var(--paper-deep)" stroke="var(--paper-rim)" />
+                  <text x="360" y="1168" textAnchor="middle" className="dg-output">♫ 一首属于这段念头的歌</text>
+                </g>
+
                 {/* 总结标签 */}
-                <text x="360" y="900" textAnchor="middle" className="dg-summary">
-                  LLM1 像图书馆员 · 找到该读的那一页 ｜ LLM2 像演员 · 把那一页念给你听
+                <text x="360" y="1230" textAnchor="middle" className="dg-summary">
+                  LLM1 像图书馆员 · 找到该读的那一页
+                </text>
+                <text x="360" y="1252" textAnchor="middle" className="dg-summary">
+                  LLM2 像演员 · 把那一页念给你听 ｜ LLM3 像词曲人 · 把它唱出来
                 </text>
               </svg>
             </article>
@@ -153,7 +182,7 @@ window.IntroCard = function({ open, onClose }) {
               <h2>致谢</h2>
 
               <h3>致谢</h3>
-              <p>感谢 cluade code；cluade design；doubao；deepseek</p>
+              <p>感谢 cluade code；cluade design；doubao；deepseek；minmax</p>
               <p>感谢一切在公开领域留下文字的写作者们——是他们的句子构成了行思的语料库，让一场跨越百年的对话成为可能。</p>
 
               <h3>灵感启发</h3>
