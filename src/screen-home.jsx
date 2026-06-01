@@ -1,6 +1,6 @@
 /* screen-home.jsx — A1 随笔簿（首页） ----------------------- */
 
-window.ScreenHome = function({ essays, cards, onNew, onOpen, onDelete, onOpenCards }) {
+window.ScreenHome = function({ essays, cards, songs, onNew, onOpen, onDelete, onOpenCards }) {
   const sorted = [...essays].sort((a,b) => (b.updated_at||0) - (a.updated_at||0));
 
   const fmtDate = (ts) => {
@@ -42,11 +42,22 @@ window.ScreenHome = function({ essays, cards, onNew, onOpen, onDelete, onOpenCar
           {sorted.map(es => {
             const essayCards = (cards || []).filter(c => c.essay_id === es.id);
             const visibleCards = essayCards.slice(0, 5);
+            const song = songs && songs[es.id];
+            const hasSong = !!(song && song.audio_url);
+            const hasLyrics = !!(song && song.lyrics && !song.audio_url);
             return (
               <div key={es.id} className="paper essay-card" onClick={() => onOpen(es.id)}>
                 <p className="first-line">{firstLine(es.content)}</p>
                 <div className="meta">
-                  <span>{fmtDate(es.updated_at)} · {es.word_count||0}字</span>
+                  <span style={{display:'inline-flex', alignItems:'center', gap:8}}>
+                    {fmtDate(es.updated_at)}
+                    {hasSong && (
+                      <span className="song-badge" title="已生成歌曲">♫</span>
+                    )}
+                    {hasLyrics && (
+                      <span className="song-badge song-badge-lyrics" title="已生成歌词，尚无音频">♪</span>
+                    )}
+                  </span>
                   <span className="echoes">
                     {(es.recent_echoes || []).slice(0,3).map((p,i) => (
                       <span key={i} className="av" title={p.name}>{p.avatar||p.name[0]}</span>

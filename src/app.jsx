@@ -381,6 +381,7 @@ function App() {
         <window.ScreenHome
           essays={essays}
           cards={cards}
+          songs={songs}
           onNew={handleNew}
           onOpen={handleOpenEssay}
           onDelete={handleDeleteEssay}

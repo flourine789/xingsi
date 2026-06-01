@@ -641,12 +641,13 @@ function extractJson(raw) {
    which: 'llm1' | 'llm2' | undefined（返回全量）
    ---------------------------------------------------------------- */
 window.getApiConfig = function(which) {
+  // 默认配置（apiKey 留空，避免泄露）
   const cfg = {
     // LLM1：匹配引擎 —— 火山方舟 Doubao + web_search (Responses API)
     llm1: {
       enabled: true,
       baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-      apiKey: 'REMOVED_KEY',
+      apiKey: '',
       model: 'doubao-seed-2-0-pro-260215',
       systemPrompt: window.DEFAULT_LLM1_SP
     },
@@ -654,11 +655,34 @@ window.getApiConfig = function(which) {
     llm2: {
       enabled: true,
       baseUrl: 'https://api.deepseek.com/v1',
-      apiKey: 'REMOVED_KEY',
+      apiKey: '',
       model: 'deepseek-v4-pro',
       systemPrompt: window.DEFAULT_LLM2_SP
     }
   };
+
+  // 叠加 localStorage 里用户填写的覆盖（apiKey / baseUrl / model / enabled）
+  try {
+    const raw = localStorage.getItem('xingsi:api-config');
+    if (raw) {
+      const stored = JSON.parse(raw);
+      for (const k of ['llm1', 'llm2']) {
+        if (stored[k]) {
+          cfg[k] = {
+            ...cfg[k],
+            ...(stored[k].apiKey !== undefined ? { apiKey: stored[k].apiKey } : {}),
+            ...(stored[k].baseUrl ? { baseUrl: stored[k].baseUrl } : {}),
+            ...(stored[k].model ? { model: stored[k].model } : {}),
+            ...(stored[k].enabled !== undefined ? { enabled: stored[k].enabled } : {}),
+            ...(stored[k].systemPrompt ? { systemPrompt: stored[k].systemPrompt } : {})
+          };
+        }
+      }
+    }
+  } catch(e) {
+    // 解析失败就用默认值
+  }
+
   return which ? cfg[which] : cfg;
 };
 
@@ -1027,7 +1051,13 @@ window.getDialogueSkillsFor = function(personaType) {
 /* ----------------------------------------------------------------
    MiniMax 音乐：先用 LLM2 写词与风格 prompt，再调 music-2.6-free
    ---------------------------------------------------------------- */
-window.MINIMAX_API_KEY = 'REMOVED_KEY';
+// MiniMax API Key 留空。运行时优先读取 localStorage['xingsi:minimax-key']，
+// 也可手动覆盖 window.MINIMAX_API_KEY 测试。
+window.MINIMAX_API_KEY = '';
+window.getMiniMaxKey = function() {
+  if (window.MINIMAX_API_KEY) return window.MINIMAX_API_KEY;
+  try { return localStorage.getItem('xingsi:minimax-key') || ''; } catch(e) { return ''; }
+};
 
 window.LYRICS_SP = `你是一位资深词作者，为 MiniMax music-2.6 作曲模型撰写可直接送入 API 的歌词与风格 prompt。基于用户提供的随笔和可选的主题/情绪/立场标签，产出一首完整的流行歌曲歌词。
 
@@ -1099,10 +1129,14 @@ window.generateLyrics = async function(essayText, tags) {
 };
 
 window.callMiniMaxMusic = async function(lyrics, prompt) {
+  const key = window.getMiniMaxKey ? window.getMiniMaxKey() : window.MINIMAX_API_KEY;
+  if (!key) {
+    throw new Error('未配置 MiniMax API Key。请在右下角"工具"面板填写，或设置 localStorage["xingsi:minimax-key"]。');
+  }
   const res = await fetch('https://api.minimax.io/v1/music_generation', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${window.MINIMAX_API_KEY}`,
+      'Authorization': `Bearer ${key}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({

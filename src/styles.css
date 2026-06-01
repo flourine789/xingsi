@@ -1708,6 +1708,27 @@ main.page {
   .tweaks { width: calc(100vw - 24px); max-width: 280px; }
 }
 
+/* ====== 随笔卡片：歌曲徽章 ====== */
+.song-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--cinnabar);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  letter-spacing: 0;
+}
+.song-badge-lyrics {
+  background: transparent;
+  color: var(--cinnabar);
+  border: 1px solid var(--cinnabar);
+}
+
 /* ====== 音乐画像面板 ====== */
 .mp-chip {
   font: inherit;
