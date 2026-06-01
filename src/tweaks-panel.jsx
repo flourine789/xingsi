@@ -86,8 +86,44 @@ window.ApiPanel = function() {
     systemPrompt: sp
   });
   const defaultCfg = {
-    llm1: defaultLLM(window.DEFAULT_LLM1_SP),
-    llm2: defaultLLM(window.DEFAULT_LLM2_SP)
+    llm1: {
+      ...defaultLLM(window.DEFAULT_LLM1_SP),
+      baseUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+      model: 'doubao-seed-2-0-pro-260215'
+    },
+    llm2: {
+      ...defaultLLM(window.DEFAULT_LLM2_SP),
+      baseUrl: 'https://api.deepseek.com/v1',
+      model: 'deepseek-v4-pro'
+    },
+    llm3: {
+      enabled: false,
+      baseUrl: 'https://api.minimax.io/v1',
+      apiKey: '',
+      model: 'music-2.6-free'
+    }
+  };
+
+  // 每个 LLM tab 的提示文案
+  const TAB_META = {
+    llm1: {
+      title: 'LLM1 匹配',
+      hint: '建议选用支持联网搜索的模型，用于在匹配候选时核实公开摘录的真实性。',
+      recommended: 'doubao-seed-2-0-pro · doubao-1-5-pro-256k-search · gpt-4o-search-preview',
+      hasSP: true
+    },
+    llm2: {
+      title: 'LLM2 对话',
+      hint: '负责角色化对话与写歌词。要求中文表达细腻、能稳定输出 JSON。',
+      recommended: 'deepseek-v4-pro · deepseek-chat · gpt-4o · claude-sonnet-4-5',
+      hasSP: true
+    },
+    llm3: {
+      title: 'LLM3 谱曲',
+      hint: 'MiniMax music-2.6 用 LLM2 写好的歌词与英文风格 prompt 直接谱成 mp3。免费档为 music-2.6-free，付费档为 music-2.6。',
+      recommended: 'MiniMax music-2.6 · music-2.6-free',
+      hasSP: false
+    }
   };
 
   const [cfg, setCfg] = window.useStored('xingsi:api-config', defaultCfg);
@@ -98,6 +134,7 @@ window.ApiPanel = function() {
   const [testResult, setTestResult] = useState('');
 
   const cur = (cfg[tab] || defaultCfg[tab]);
+  const meta = TAB_META[tab];
   const setCur = (k, v) => setCfg(prev => ({
     ...prev,
     [tab]: { ...(prev[tab] || defaultCfg[tab]), [k]: v }
@@ -105,25 +142,31 @@ window.ApiPanel = function() {
 
   const switchTab = (t) => { setTab(t); setTestResult(''); setShowSP(false); };
 
+  const SAMPLE_ESSAY = '今晚读完一本旧书,合上的时候窗外正在下雨。我一直想不明白:为什么我们做的事比父辈多,内心却更加疲惫?是我们想得太多,还是这个时代过分喧嚣?';
+
   const runTest = async () => {
     setTesting(true);
     setTestResult('');
     try {
       if (tab === 'llm1') {
-        const r = await window.callLLM1(
-          '今晚读完一本旧书,合上的时候窗外正在下雨。我一直想不明白:为什么我们做的事比父辈多,内心却更加疲惫?是我们想得太多,还是这个时代过分喧嚣?'
-        );
+        const r = await window.callLLM1(SAMPLE_ESSAY);
         setTestResult(JSON.stringify(r, null, 2));
-      } else {
+      } else if (tab === 'llm2') {
         const p = window.PERSONAS[0];
         const r = await window.callLLM2({
           persona: p,
-          essay_context: '今晚读完一本旧书,合上的时候窗外正在下雨。我一直想不明白:为什么我们做的事比父辈多,内心却更加疲惫?是我们想得太多,还是这个时代过分喧嚣?',
+          essay_context: SAMPLE_ESSAY,
           dialogue_history: [],
           action: 'respond',
           user_message: ''
         });
         setTestResult(r.text);
+      } else if (tab === 'llm3') {
+        setTestResult('正在写词 + 调用 MiniMax，约需 30-60 秒…');
+        const { lyrics, prompt } = await window.generateLyrics(SAMPLE_ESSAY, null);
+        setTestResult(`✓ 写词成功，正在谱曲…\n\n风格 prompt：${prompt}\n\n歌词预览：\n${lyrics.slice(0, 200)}…`);
+        const { audio_url, duration } = await window.callMiniMaxMusic(lyrics, prompt);
+        setTestResult(`✓ 谱曲成功（${duration || '?'} 秒）\n\n音频地址：\n${audio_url}\n\n风格 prompt：${prompt}\n\n歌词预览：\n${lyrics.slice(0, 300)}…`);
       }
     } catch(e) {
       setTestResult('错误：' + e.message);
@@ -156,15 +199,27 @@ window.ApiPanel = function() {
           <div className="tweak-radios">
             <button className={`tweak-radio ${tab==='llm1'?'active':''}`} onClick={() => switchTab('llm1')}>LLM1 匹配</button>
             <button className={`tweak-radio ${tab==='llm2'?'active':''}`} onClick={() => switchTab('llm2')}>LLM2 对话</button>
+            <button className={`tweak-radio ${tab==='llm3'?'active':''}`} onClick={() => switchTab('llm3')}>LLM3 谱曲</button>
           </div>
         </div>
+
+        {/* 当前 tab 的提示 */}
+        {meta && (
+          <div className="tweak-section api-hint">
+            <div className="api-hint-body">{meta.hint}</div>
+            <div className="api-hint-models">
+              <span className="api-hint-label">推荐模型</span>
+              <span className="api-hint-value">{meta.recommended}</span>
+            </div>
+          </div>
+        )}
 
         {/* 启用 */}
         <div className="tweak-section">
           <div className="lbl">模式</div>
           <label className="api-toggle-row">
             <input type="checkbox" checked={cur.enabled} onChange={e => setCur('enabled', e.target.checked)} />
-            <span>{cur.enabled ? '真实 API' : '模拟数据'}</span>
+            <span>{cur.enabled ? '真实 API' : (tab === 'llm3' ? '未启用' : '模拟数据')}</span>
           </label>
         </div>
 
@@ -173,43 +228,53 @@ window.ApiPanel = function() {
           <div className="lbl">Base URL</div>
           <input className="api-input" value={cur.baseUrl}
             onChange={e => setCur('baseUrl', e.target.value)}
-            placeholder="https://api.openai.com/v1" />
+            placeholder={tab === 'llm3' ? 'https://api.minimax.io/v1' : 'https://api.openai.com/v1'} />
         </div>
         <div className="tweak-section">
           <div className="lbl">API Key</div>
           <input className="api-input" type="password" value={cur.apiKey}
             onChange={e => setCur('apiKey', e.target.value)}
-            placeholder="sk-..." />
+            placeholder={tab === 'llm3' ? 'MiniMax API Key' : 'sk-...'} />
         </div>
         <div className="tweak-section">
           <div className="lbl">模型</div>
           <input className="api-input" value={cur.model}
             onChange={e => setCur('model', e.target.value)}
-            placeholder="gpt-4o" />
+            placeholder={
+              tab === 'llm1' ? 'doubao-seed-2-0-pro-260215' :
+              tab === 'llm2' ? 'deepseek-v4-pro' :
+              'music-2.6-free'
+            } />
         </div>
 
-        {/* System Prompt */}
-        <div className="tweak-section">
-          <button className="tweak-radio" style={{width:'100%'}}
-            onClick={() => setShowSP(s => !s)}>
-            {showSP ? '▲ 收起' : '▼ 编辑'} System Prompt
-          </button>
-        </div>
-        {showSP && (
-          <div className="tweak-section">
-            <textarea className="api-input api-sp"
-              value={cur.systemPrompt}
-              onChange={e => setCur('systemPrompt', e.target.value)} />
-            {tab === 'llm2' && <div className="api-vars">可用变量：{SP_VARS}</div>}
-            <button className="api-reset" onClick={() => setCur('systemPrompt', defaultSP)}>重置默认</button>
-          </div>
+        {/* System Prompt — 仅 LLM1 / LLM2 */}
+        {meta && meta.hasSP && (
+          <>
+            <div className="tweak-section">
+              <button className="tweak-radio" style={{width:'100%'}}
+                onClick={() => setShowSP(s => !s)}>
+                {showSP ? '▲ 收起' : '▼ 编辑'} System Prompt
+              </button>
+            </div>
+            {showSP && (
+              <div className="tweak-section">
+                <textarea className="api-input api-sp"
+                  value={cur.systemPrompt || ''}
+                  onChange={e => setCur('systemPrompt', e.target.value)} />
+                {tab === 'llm2' && <div className="api-vars">可用变量：{SP_VARS}</div>}
+                <button className="api-reset" onClick={() => setCur('systemPrompt', defaultSP)}>重置默认</button>
+              </div>
+            )}
+          </>
         )}
 
         {/* 测试 */}
         <div className="tweak-section">
           <button className="tweak-radio api-test-btn" style={{width:'100%'}}
             onClick={runTest} disabled={testing}>
-            {testing ? '调用中⋯' : `▶ 测试 ${tab === 'llm1' ? 'LLM1' : 'LLM2'}`}
+            {testing ? '调用中⋯'
+              : tab === 'llm3' ? '▶ 测试 LLM3（写词+谱曲，约 60s）'
+              : `▶ 测试 ${meta ? meta.title.split(' ')[0] : ''}`}
           </button>
         </div>
         {testResult && (

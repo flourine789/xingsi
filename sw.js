@@ -1,7 +1,7 @@
 // 行思 · Xing-Si — Service Worker
 // 改动了 app 文件后请把 CACHE_VERSION 加 1，强制更新
 
-const CACHE_VERSION = 'xingsi-v5';
+const CACHE_VERSION = 'xingsi-v6';
 const APP_SHELL = [
   './',
   './index.html',

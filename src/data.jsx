@@ -1051,13 +1051,31 @@ window.getDialogueSkillsFor = function(personaType) {
 /* ----------------------------------------------------------------
    MiniMax 音乐：先用 LLM2 写词与风格 prompt，再调 music-2.6-free
    ---------------------------------------------------------------- */
-// MiniMax API Key 留空。运行时优先读取 localStorage['xingsi:minimax-key']，
-// 也可手动覆盖 window.MINIMAX_API_KEY 测试。
+// MiniMax API Key 留空。运行时按以下优先级读取：
+//   1. window.MINIMAX_API_KEY（运行时覆盖，最高优先级）
+//   2. localStorage['xingsi:api-config'].llm3.apiKey（API 面板写入）
+//   3. localStorage['xingsi:minimax-key']（向后兼容）
 window.MINIMAX_API_KEY = '';
-window.getMiniMaxKey = function() {
-  if (window.MINIMAX_API_KEY) return window.MINIMAX_API_KEY;
-  try { return localStorage.getItem('xingsi:minimax-key') || ''; } catch(e) { return ''; }
+window.getMiniMaxConfig = function() {
+  let cfg = { baseUrl: 'https://api.minimax.io/v1', apiKey: '', model: 'music-2.6-free' };
+  try {
+    const raw = localStorage.getItem('xingsi:api-config');
+    if (raw) {
+      const stored = JSON.parse(raw);
+      if (stored.llm3) {
+        if (stored.llm3.apiKey) cfg.apiKey = stored.llm3.apiKey;
+        if (stored.llm3.baseUrl) cfg.baseUrl = stored.llm3.baseUrl;
+        if (stored.llm3.model) cfg.model = stored.llm3.model;
+      }
+    }
+  } catch(e) {}
+  if (!cfg.apiKey) {
+    try { cfg.apiKey = localStorage.getItem('xingsi:minimax-key') || ''; } catch(e) {}
+  }
+  if (window.MINIMAX_API_KEY) cfg.apiKey = window.MINIMAX_API_KEY;
+  return cfg;
 };
+window.getMiniMaxKey = function() { return window.getMiniMaxConfig().apiKey; };
 
 window.LYRICS_SP = `你是一位资深词作者，为 MiniMax music-2.6 作曲模型撰写可直接送入 API 的歌词与风格 prompt。基于用户提供的随笔和可选的主题/情绪/立场标签，产出一首完整的流行歌曲歌词。
 
@@ -1129,18 +1147,21 @@ window.generateLyrics = async function(essayText, tags) {
 };
 
 window.callMiniMaxMusic = async function(lyrics, prompt) {
-  const key = window.getMiniMaxKey ? window.getMiniMaxKey() : window.MINIMAX_API_KEY;
-  if (!key) {
-    throw new Error('未配置 MiniMax API Key。请在右下角"工具"面板填写，或设置 localStorage["xingsi:minimax-key"]。');
+  const mm = window.getMiniMaxConfig
+    ? window.getMiniMaxConfig()
+    : { baseUrl: 'https://api.minimax.io/v1', apiKey: window.MINIMAX_API_KEY || '', model: 'music-2.6-free' };
+  if (!mm.apiKey) {
+    throw new Error('未配置 MiniMax API Key。请在右下角"API"面板的 LLM3 标签填写。');
   }
-  const res = await fetch('https://api.minimax.io/v1/music_generation', {
+  const base = (mm.baseUrl || 'https://api.minimax.io/v1').replace(/\/$/, '');
+  const res = await fetch(`${base}/music_generation`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${key}`,
+      'Authorization': `Bearer ${mm.apiKey}`,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      model: 'music-2.6-free',
+      model: mm.model || 'music-2.6-free',
       prompt,
       lyrics,
       output_format: 'url',
