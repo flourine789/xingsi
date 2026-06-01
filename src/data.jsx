@@ -848,6 +848,8 @@ window.callLLM2 = async function(input) {
   const actionDesc = {
     respond: '请回应用户的最新发言。',
     continue: '请顺着用户随笔往下续写一段。',
+    rebut: '请站在你这位角色的立场，对用户的观点提出有理有据的反驳。',
+    opposite_view: '请暂时跳出你扮演的角色，用相反立场重新审视用户的随笔。',
     deepen: '请引入更深层的视角、案例或抽象思考。'
   };
 
@@ -859,7 +861,8 @@ window.callLLM2 = async function(input) {
     else if (m.role === 'persona') msgs.push({ role: 'assistant', content: m.text });
   }
 
-  const actionHint = actionDesc[input.action] || actionDesc.respond;
+  // skill: 优先使用调用方传入的 prompt_template；否则退回 actionDesc
+  const actionHint = input.action_prompt || actionDesc[input.action] || actionDesc.respond;
   msgs.push({ role: 'user', content: input.user_message ? `${input.user_message}\n\n（${actionHint}）` : actionHint });
 
   const base = cfg.baseUrl.replace(/\/$/, '');
@@ -879,6 +882,146 @@ window.callLLM2 = async function(input) {
     cited_snippets: undefined,
     suggested_followups: ['让 ta 再说细一些', '问 ta：那你呢？', '让 ta 给一个反例']
   };
+};
+
+/* ----------------------------------------------------------------
+   Skill Registry · 可复用的"动作"
+   - 统一存于 localStorage['xingsi:skills']
+   - scope: 'dialogue' | 'song' | 'writing-assist'
+   - source: 'builtin' | 'user' | 'auto-derived'
+   ---------------------------------------------------------------- */
+window.SKILLS_KEY = 'xingsi:skills';
+
+window.BUILTIN_SKILLS = [
+  {
+    id: 'sk_respond',
+    name: '让 ta 回应这段话',
+    description: '针对你的最新发言给出角色化回应',
+    scope: 'dialogue',
+    prompt_template: '请回应用户的最新发言。',
+    applies_to: ['writer', 'celebrity', 'news'],
+    source: 'builtin',
+    uses: 0, starred: true, created_at: 0
+  },
+  {
+    id: 'sk_continue',
+    name: '让 ta 续写',
+    description: '顺着你的随笔往下写一段',
+    scope: 'dialogue',
+    prompt_template: '请顺着用户随笔往下续写一段。',
+    applies_to: ['writer', 'celebrity', 'news'],
+    source: 'builtin',
+    uses: 0, starred: true, created_at: 0
+  },
+  {
+    id: 'sk_rebut',
+    name: '让 ta 提出反驳',
+    description: '从该角色立场质疑用户',
+    scope: 'dialogue',
+    prompt_template: '请站在你这位角色的立场，对用户的观点提出有理有据的反驳。语气坚定但不失尊重。',
+    applies_to: ['writer', 'celebrity', 'news'],
+    source: 'builtin',
+    uses: 0, starred: false, created_at: 0
+  },
+  {
+    id: 'sk_opposite',
+    name: '从相反立场重审',
+    description: '暂时跳出角色，扮演对立观点',
+    scope: 'dialogue',
+    prompt_template: '请暂时跳出你扮演的角色，用与之相反的立场重新审视用户的随笔，给出对方可能的反论。',
+    applies_to: ['writer', 'celebrity', 'news'],
+    source: 'builtin',
+    uses: 0, starred: false, created_at: 0
+  },
+  {
+    id: 'sk_deepen',
+    name: '更深一层的角度',
+    description: '引入更抽象的视角或新案例',
+    scope: 'dialogue',
+    prompt_template: '请引入更深层的视角、案例或抽象思考。',
+    applies_to: ['writer', 'celebrity', 'news'],
+    source: 'builtin',
+    uses: 0, starred: true, created_at: 0
+  }
+];
+
+window.getSkills = function() {
+  try {
+    const raw = localStorage.getItem(window.SKILLS_KEY);
+    if (!raw) {
+      window.saveSkills(window.BUILTIN_SKILLS);
+      return [...window.BUILTIN_SKILLS];
+    }
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [...window.BUILTIN_SKILLS];
+    // 确保内置 skill 始终存在（用户可能删了，但本次启动重新出现）
+    const haveBuiltinIds = new Set(arr.filter(s => s.source === 'builtin').map(s => s.id));
+    const missing = window.BUILTIN_SKILLS.filter(b => !haveBuiltinIds.has(b.id));
+    if (missing.length) {
+      const merged = [...missing, ...arr];
+      window.saveSkills(merged);
+      return merged;
+    }
+    return arr;
+  } catch(e) {
+    return [...window.BUILTIN_SKILLS];
+  }
+};
+
+window.saveSkills = function(skills) {
+  try {
+    localStorage.setItem(window.SKILLS_KEY, JSON.stringify(skills));
+  } catch(e) {
+    console.warn('[saveSkills] 失败：', e);
+  }
+};
+
+window.addSkill = function(skill) {
+  const skills = window.getSkills();
+  const s = {
+    id: 'sk_' + Math.random().toString(36).slice(2, 10),
+    name: skill.name || '未命名 skill',
+    description: skill.description || '',
+    scope: skill.scope || 'dialogue',
+    prompt_template: skill.prompt_template || '',
+    applies_to: Array.isArray(skill.applies_to) ? skill.applies_to : ['writer','celebrity','news'],
+    source: skill.source || 'user',
+    uses: 0,
+    starred: false,
+    created_at: Date.now(),
+    created_from: skill.created_from || null
+  };
+  window.saveSkills([...skills, s]);
+  return s;
+};
+
+window.deleteSkill = function(id) {
+  const skills = window.getSkills().filter(s => s.id !== id);
+  window.saveSkills(skills);
+};
+
+window.incrementSkillUse = function(id) {
+  const skills = window.getSkills().map(s =>
+    s.id === id ? { ...s, uses: (s.uses || 0) + 1 } : s
+  );
+  window.saveSkills(skills);
+};
+
+window.toggleSkillStar = function(id) {
+  const skills = window.getSkills().map(s =>
+    s.id === id ? { ...s, starred: !s.starred } : s
+  );
+  window.saveSkills(skills);
+};
+
+window.getDialogueSkillsFor = function(personaType) {
+  return window.getSkills()
+    .filter(s => s.scope === 'dialogue')
+    .filter(s => !s.applies_to || s.applies_to.length === 0 || s.applies_to.includes(personaType))
+    .sort((a, b) => {
+      if ((b.starred ? 1 : 0) !== (a.starred ? 1 : 0)) return (b.starred ? 1 : 0) - (a.starred ? 1 : 0);
+      return (b.uses || 0) - (a.uses || 0);
+    });
 };
 
 /* ----------------------------------------------------------------
@@ -919,6 +1062,15 @@ window.generateLyrics = async function(essayText, tags) {
   const tagDesc = tags
     ? `\n参考标签：主题=${(tags.theme||[]).join('/')}; 情绪=${(tags.emotion||[]).join('/')}; 立场=${(tags.stance||[]).join('/')}`
     : '';
+
+  // 注入用户音乐画像（hermes-style 记忆）
+  const profileText = window.compileMusicProfileText
+    ? window.compileMusicProfileText(window.getMusicProfile())
+    : '';
+  const systemContent = profileText
+    ? `${profileText}\n\n---\n\n${window.LYRICS_SP}`
+    : window.LYRICS_SP;
+
   const userContent = `随笔：\n${essayText}${tagDesc}\n\n请为它写一首歌的歌词与风格 prompt。`;
   const base = cfg.baseUrl.replace(/\/$/, '');
 
@@ -928,7 +1080,7 @@ window.generateLyrics = async function(essayText, tags) {
     body: JSON.stringify({
       model: cfg.model,
       messages: [
-        { role: 'system', content: window.LYRICS_SP },
+        { role: 'system', content: systemContent },
         { role: 'user', content: userContent }
       ],
       response_format: { type: 'json_object' },
@@ -976,3 +1128,293 @@ window.callMiniMaxMusic = async function(lyrics, prompt) {
     duration: (data.extra_info && data.extra_info.music_duration) || null
   };
 };
+
+/* ----------------------------------------------------------------
+   音乐画像 · Hermes-style 记忆层
+   - 存于 localStorage['xingsi:music-profile']
+   - 写歌时通过 compileMusicProfileText 注入到 LYRICS_SP 顶部
+   ---------------------------------------------------------------- */
+window.MUSIC_PROFILE_KEY = 'xingsi:music-profile';
+
+window.DEFAULT_MUSIC_PROFILE = {
+  presets: {
+    genres: [],
+    moods: [],
+    instruments: [],
+    languages: [],
+    freeText: ''
+  },
+  references: [],   // [{id, kind:'artist'|'lyrics', label, analysis, created_at}]
+  trajectories: [], // 最近 12 首歌的简版记录，供 insights 反思用
+  lastReflectedAt: 0,           // 上次反思时 trajectories 的长度
+  freeTextManual: '',           // 用户手动写过的原始 freeText（反思时保留）
+  reflectionHistory: []         // [{at, prevFreeText, newFreeText, basis}]
+};
+
+window.getMusicProfile = function() {
+  try {
+    const raw = localStorage.getItem(window.MUSIC_PROFILE_KEY);
+    if (!raw) return window.DEFAULT_MUSIC_PROFILE;
+    const p = JSON.parse(raw);
+    return {
+      presets: { ...window.DEFAULT_MUSIC_PROFILE.presets, ...(p.presets || {}) },
+      references: Array.isArray(p.references) ? p.references : [],
+      trajectories: Array.isArray(p.trajectories) ? p.trajectories : [],
+      lastReflectedAt: typeof p.lastReflectedAt === 'number' ? p.lastReflectedAt : 0,
+      freeTextManual: typeof p.freeTextManual === 'string' ? p.freeTextManual : '',
+      reflectionHistory: Array.isArray(p.reflectionHistory) ? p.reflectionHistory : []
+    };
+  } catch(e) {
+    return window.DEFAULT_MUSIC_PROFILE;
+  }
+};
+
+window.saveMusicProfile = function(profile) {
+  try {
+    localStorage.setItem(window.MUSIC_PROFILE_KEY, JSON.stringify(profile));
+  } catch(e) {
+    console.warn('[saveMusicProfile] 写入失败:', e);
+  }
+};
+
+window.compileMusicProfileText = function(profile) {
+  if (!profile) return '';
+  const { presets, references } = profile;
+  const parts = [];
+
+  const presetLines = [];
+  if (presets.genres && presets.genres.length) presetLines.push(`- 喜欢的曲风：${presets.genres.join('、')}`);
+  if (presets.moods && presets.moods.length) presetLines.push(`- 偏好的情绪：${presets.moods.join('、')}`);
+  if (presets.instruments && presets.instruments.length) presetLines.push(`- 偏爱的乐器：${presets.instruments.join('、')}`);
+  if (presets.languages && presets.languages.length) presetLines.push(`- 语种偏好：${presets.languages.join('、')}`);
+  if (presets.freeText && presets.freeText.trim()) presetLines.push(`- 用户补充：${presets.freeText.trim()}`);
+  if (presetLines.length) parts.push(`【用户预设】\n${presetLines.join('\n')}`);
+
+  if (references && references.length) {
+    const refLines = references.slice(-8).map(r => {
+      const kindLabel = r.kind === 'artist' ? '歌手' : '歌词';
+      return `- ${kindLabel}「${r.label}」：${r.analysis}`;
+    });
+    parts.push(`【用户喜欢的参考】\n${refLines.join('\n')}`);
+  }
+
+  if (parts.length === 0) return '';
+  return `【关于这位用户的音乐画像】
+（以下是用户提前告诉你的喜好，请在创作中尽量贴合；如与本次随笔情绪冲突，以随笔情绪为准。）
+
+${parts.join('\n\n')}`;
+};
+
+/* ----------------------------------------------------------------
+   analyzeArtist / analyzeLyrics — 让 LLM 把"我喜欢这个"解析成可注入的描述
+   ---------------------------------------------------------------- */
+window.ARTIST_ANALYSIS_SP = `你是一位音乐评论员，熟悉中外流行音乐史。给定一位歌手/词曲人/乐队的名字，用 80-160 字提炼他/她的核心风格特征，作为给作曲 AI 的参考。
+
+只输出纯文本（不要 JSON，不要 Markdown，不要标题），按以下维度凝练：
+- 主要曲风（如 indie folk、city pop、ambient piano）
+- 典型情绪与主题
+- 标志性意象、用词或乐器
+- 句长 / 押韵 / 编曲的偏好（如有）
+
+如果不认识这位歌手，直接回答："不认识这位歌手，请改贴歌词。"`;
+
+window.analyzeArtist = async function(name) {
+  const cfg = window.getApiConfig('llm2');
+  if (!cfg.enabled || !cfg.apiKey) {
+    return `（未配置 API，跳过解析）喜欢 ${name} 的风格`;
+  }
+  const base = cfg.baseUrl.replace(/\/$/, '');
+  const res = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+    body: JSON.stringify({
+      model: cfg.model,
+      messages: [
+        { role: 'system', content: window.ARTIST_ANALYSIS_SP },
+        { role: 'user', content: `歌手：${name}` }
+      ],
+      temperature: 0.5,
+      max_tokens: 400
+    })
+  });
+  if (!res.ok) {
+    const err = await res.text().catch(() => res.statusText);
+    throw new Error(`Analyze API ${res.status}: ${err}`);
+  }
+  const data = await res.json();
+  const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+  return text.trim();
+};
+
+/* ----------------------------------------------------------------
+   recordSongTrajectory — 每首歌生成后写入一条轻量轨迹
+   reflectMusicProfileIfNeeded — 每 3 首歌做一次 insights 反思，重写 freeText
+   ---------------------------------------------------------------- */
+window.REFLECT_EVERY = 3;
+
+window.recordSongTrajectory = function({ essay_id, essay_text, lyrics, prompt }) {
+  const profile = window.getMusicProfile();
+  const head = (lyrics || '').split('\n').filter(Boolean).slice(0, 4).join(' / ');
+  const traj = {
+    essay_id,
+    essay_snippet: (essay_text || '').slice(0, 80),
+    lyrics_head: head.slice(0, 120),
+    style_prompt: prompt || '',
+    at: Date.now()
+  };
+  const next = {
+    ...profile,
+    trajectories: [...profile.trajectories, traj].slice(-12)  // 最近 12 首
+  };
+  window.saveMusicProfile(next);
+  return next;
+};
+
+window.INSIGHTS_SP = `你是一位贴心的音乐策展人，正在观察一位用户的写歌偏好。基于最近几首歌的素材和用户已有的画像，更新一段简短的"自由补充"（freeText），让 AI 下次写歌更贴近这位用户。
+
+输出严格要求：
+- 只输出新的 freeText 内容，不要任何前后缀、不要 Markdown、不要标题、不要引号
+- 长度 50-150 字之间
+- 必须保留用户曾经手动写过的关键诉求（如有，会在输入中给出）
+- 在此基础上凝练 1-3 条新观察（重复出现的主题、情绪倾向、回避的元素、偏爱的句法等）
+- 用第二人称或描述性陈述，不要用"用户希望…"这样的元描述
+- 不要重复 presets 里已有的曲风/情绪标签，那些已经在画像别处了`;
+
+window.reflectMusicProfileIfNeeded = async function() {
+  const profile = window.getMusicProfile();
+  const total = profile.trajectories.length;
+  const sinceLast = total - profile.lastReflectedAt;
+  if (sinceLast < window.REFLECT_EVERY) return { triggered: false };
+
+  const cfg = window.getApiConfig('llm2');
+  if (!cfg.enabled || !cfg.apiKey) {
+    // 没 API 也要推进 counter，避免下次再立刻触发
+    window.saveMusicProfile({ ...profile, lastReflectedAt: total });
+    return { triggered: false, reason: 'no-api' };
+  }
+
+  const recent = profile.trajectories.slice(-window.REFLECT_EVERY);
+  const recentText = recent.map((t, i) =>
+    `第 ${i+1} 首：\n  随笔片段：${t.essay_snippet}\n  歌词开头：${t.lyrics_head}\n  风格 prompt：${t.style_prompt}`
+  ).join('\n\n');
+
+  const presetSummary = [
+    profile.presets.genres.length ? `曲风：${profile.presets.genres.join('、')}` : null,
+    profile.presets.moods.length ? `情绪：${profile.presets.moods.join('、')}` : null,
+    profile.presets.instruments.length ? `乐器：${profile.presets.instruments.join('、')}` : null,
+  ].filter(Boolean).join('；') || '（无）';
+
+  const userContent = `用户已有的预设：${presetSummary}
+
+用户曾经手动写过的"自由补充"原文（必须保留其中的关键诉求）：
+${profile.freeTextManual || '（暂无）'}
+
+最近 ${recent.length} 首歌的素材：
+
+${recentText}
+
+请基于上述材料，更新这段自由补充。`;
+
+  try {
+    const base = cfg.baseUrl.replace(/\/$/, '');
+    const res = await fetch(`${base}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+      body: JSON.stringify({
+        model: cfg.model,
+        messages: [
+          { role: 'system', content: window.INSIGHTS_SP },
+          { role: 'user', content: userContent }
+        ],
+        temperature: 0.4,
+        max_tokens: 400
+      })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    let newText = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content || '').trim();
+    // 去掉常见的反引号/引号包裹
+    newText = newText.replace(/^["「『]+|["」』]+$/g, '').replace(/^```[\s\S]*?\n|```$/g, '').trim();
+    if (!newText || newText.length < 10) {
+      window.saveMusicProfile({ ...profile, lastReflectedAt: total });
+      return { triggered: false, reason: 'empty' };
+    }
+
+    const prevFreeText = profile.presets.freeText || '';
+    const next = {
+      ...profile,
+      presets: { ...profile.presets, freeText: newText },
+      lastReflectedAt: total,
+      reflectionHistory: [
+        ...profile.reflectionHistory,
+        { at: Date.now(), prevFreeText, newFreeText: newText, basis_count: recent.length }
+      ].slice(-10)  // 保留最近 10 次反思
+    };
+    window.saveMusicProfile(next);
+    return { triggered: true, prevFreeText, newFreeText: newText };
+  } catch(err) {
+    console.warn('[reflectMusicProfile] 失败：', err);
+    // 失败也推进 counter，避免反复重试
+    window.saveMusicProfile({ ...profile, lastReflectedAt: total });
+    return { triggered: false, reason: 'error', error: err.message };
+  }
+};
+
+window.LYRICS_ANALYSIS_SP = `你是一位音乐评论员。给定用户喜欢的一段歌词，用 80-160 字提炼这段歌词的风格特征，作为给作曲 AI 的参考。
+
+只输出纯文本（不要 JSON，不要 Markdown，不要标题），按以下维度凝练：
+- 主题与情绪走向
+- 意象密度与典型意象
+- 句长、押韵密度、节奏
+- 可能的曲风与编曲提示`;
+
+window.analyzeLyrics = async function(lyricsText, label) {
+  const cfg = window.getApiConfig('llm2');
+  if (!cfg.enabled || !cfg.apiKey) {
+    return `（未配置 API，跳过解析）参考：${(label || '').slice(0, 30)}`;
+  }
+  const base = cfg.baseUrl.replace(/\/$/, '');
+  const userContent = label
+    ? `用户喜欢这段歌词（标题：${label}）：\n\n${lyricsText}`
+    : `用户喜欢这段歌词：\n\n${lyricsText}`;
+  const res = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
+    body: JSON.stringify({
+      model: cfg.model,
+      messages: [
+        { role: 'system', content: window.LYRICS_ANALYSIS_SP },
+        { role: 'user', content: userContent }
+      ],
+      temperature: 0.5,
+      max_tokens: 400
+    })
+  });
+  if (!res.ok) {
+    const err = await res.text().catch(() => res.statusText);
+    throw new Error(`Analyze API ${res.status}: ${err}`);
+  }
+  const data = await res.json();
+  const text = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+  return text.trim();
+};
+
+/* ----------------------------------------------------------------
+   预设清单（可勾选项）
+   ---------------------------------------------------------------- */
+window.MUSIC_PRESET_OPTIONS = {
+  genres: [
+    '民谣', '独立摇滚', 'indie folk', 'city pop', '古风', '电子', 'ambient',
+    'lo-fi', 'R&B', '爵士', '说唱', '后摇', '钢琴小品', '流行', '世界音乐'
+  ],
+  moods: [
+    '克制', '宁静', '温柔', '怅然', '思辨', '疏离', '热烈',
+    '怀旧', '浪漫', '苍凉', '俏皮', '神秘', '坚定'
+  ],
+  instruments: [
+    '钢琴', '木吉他', '电吉他', '弦乐', '合成器',
+    '鼓组', '萨克斯', '口琴', '古筝', '笛箫', '人声合唱', '极简编曲'
+  ],
+  languages: ['中文', '英文', '中英混搭']
+};
+

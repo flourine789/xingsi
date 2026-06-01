@@ -1,9 +1,21 @@
 /* screen-song.jsx — 歌曲页（基于随笔与匹配 tags 自动生成） */
 
-window.ScreenSong = function({ essay, song, composingState, composingError, onBack, onCompose }) {
+window.ScreenSong = function({ essay, song, composingState, composingError, onBack, onCompose, toast }) {
   // composingState: null | 'lyrics' | 'music'
   const busy = composingState === 'lyrics' || composingState === 'music';
   const hasSong = !!(song && song.audio_url && song.lyrics);
+  const [profileOpen, setProfileOpen] = React.useState(false);
+
+  // 当前画像简短摘要
+  const profileSummary = React.useMemo(() => {
+    const p = window.getMusicProfile ? window.getMusicProfile() : null;
+    if (!p) return null;
+    const presetCount = (p.presets.genres||[]).length + (p.presets.moods||[]).length +
+                        (p.presets.instruments||[]).length + (p.presets.languages||[]).length +
+                        ((p.presets.freeText||'').trim() ? 1 : 0);
+    const refCount = (p.references||[]).length;
+    return { presetCount, refCount, hasAny: presetCount + refCount > 0 };
+  }, [profileOpen]);
 
   return (
     <main className="page">
@@ -15,10 +27,28 @@ window.ScreenSong = function({ essay, song, composingState, composingError, onBa
       </div>
 
       <div className="paper" style={{padding: '32px 36px', maxWidth: 720, margin: '0 auto'}}>
-        <h2 style={{margin: 0, fontFamily: 'var(--serif)', letterSpacing: 2}}>这段念头，唱给你听</h2>
-        <p style={{fontSize: 13, color: 'var(--ink-mute)', marginTop: 8}}>
-          以你的随笔为蓝本，由 DeepSeek 写词，MiniMax 谱曲。
-        </p>
+        <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:16}}>
+          <div>
+            <h2 style={{margin: 0, fontFamily: 'var(--serif)', letterSpacing: 2}}>这段念头，唱给你听</h2>
+            <p style={{fontSize: 13, color: 'var(--ink-mute)', marginTop: 8}}>
+              以你的随笔为蓝本，由 DeepSeek 写词，MiniMax 谱曲。
+            </p>
+          </div>
+          <button className="btn btn-sm"
+                  onClick={() => setProfileOpen(true)}
+                  title="设置喜欢的曲风、歌手、歌词参考"
+                  style={{flexShrink:0, whiteSpace:'nowrap'}}>
+            🎵 我的曲风偏好
+            {profileSummary && profileSummary.hasAny && (
+              <span style={{
+                marginLeft:6, fontSize:10, padding:'1px 6px', borderRadius:999,
+                background:'var(--cinnabar)', color:'#fff', letterSpacing:0
+              }}>
+                {profileSummary.presetCount + profileSummary.refCount}
+              </span>
+            )}
+          </button>
+        </div>
 
         {!hasSong && !busy && !composingError && (
           <div style={{textAlign:'center', padding:'40px 0'}}>
@@ -93,6 +123,12 @@ window.ScreenSong = function({ essay, song, composingState, composingError, onBa
           </div>
         )}
       </div>
+
+      <window.MusicProfilePanel
+        open={profileOpen}
+        onClose={() => setProfileOpen(false)}
+        toast={toast}
+      />
     </main>
   );
 };

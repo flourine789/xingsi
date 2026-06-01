@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="行思">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f5ecda"/>
+      <stop offset="100%" stop-color="#e8dcc1"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" ry="96" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="180" fill="none" stroke="#a8332a" stroke-width="3" opacity="0.18"/>
+  <text x="256" y="340" text-anchor="middle"
+        font-family="'Ma Shan Zheng','Noto Serif SC',serif"
+        font-size="320" font-weight="700" fill="#a8332a">行</text>
+</svg>

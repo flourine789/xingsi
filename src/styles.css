@@ -1707,3 +1707,40 @@ main.page {
   .panels-dock { right: 12px; bottom: 12px; }
   .tweaks { width: calc(100vw - 24px); max-width: 280px; }
 }
+
+/* ====== 音乐画像面板 ====== */
+.mp-chip {
+  font: inherit;
+  font-size: 12.5px;
+  letter-spacing: .5px;
+  background: var(--paper-soft);
+  color: var(--ink-soft);
+  border: 1px solid var(--paper-rim);
+  padding: 5px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.mp-chip:hover { background: var(--paper-deep); }
+.mp-chip.active {
+  background: var(--cinnabar);
+  color: #fff;
+  border-color: var(--cinnabar);
+}
+.mp-input, .mp-textarea {
+  width: 100%;
+  font: inherit;
+  font-family: var(--serif);
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--paper-soft);
+  border: 1px solid var(--paper-rim);
+  border-radius: 6px;
+  padding: 10px 12px;
+  outline: none;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.mp-input:focus, .mp-textarea:focus { border-color: var(--cinnabar); }
+.mp-textarea { line-height: 1.7; }
+

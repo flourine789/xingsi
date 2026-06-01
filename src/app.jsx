@@ -180,6 +180,20 @@ function App() {
         [activeEssay.id]: { lyrics, prompt, audio_url, duration, created_at: Date.now() }
       }));
       setComposingState(null);
+
+      // 记录轨迹 + 异步反思（每 REFLECT_EVERY 首一次）
+      if (window.recordSongTrajectory) {
+        window.recordSongTrajectory({
+          essay_id: activeEssay.id,
+          essay_text: activeEssay.content,
+          lyrics, prompt
+        });
+      }
+      if (window.reflectMusicProfileIfNeeded) {
+        window.reflectMusicProfileIfNeeded().then(r => {
+          if (r && r.triggered) toast('已根据最近 3 首歌更新你的曲风画像');
+        }).catch(() => {});
+      }
     } catch(err) {
       console.error('[composeSong]', err);
       setComposingError(err.message || '未知错误');
@@ -326,6 +340,7 @@ function App() {
           composingError={composingError}
           onBack={() => setRoute('echoes')}
           onCompose={handleComposeSong}
+          toast={toast}
         />
       );
       break;

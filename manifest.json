@@ -1,0 +1,21 @@
+{
+  "name": "行思 · Xing-Si",
+  "short_name": "行思",
+  "description": "古人今人若流水，共看明月皆如此。在共鸣里看见自己。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3ead8",
+  "theme_color": "#a8332a",
+  "lang": "zh-CN",
+  "categories": ["productivity", "lifestyle", "education"],
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

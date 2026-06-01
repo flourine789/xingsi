@@ -2,8 +2,20 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>行思 · Xing-Si — 古人今人若流水，共看明月皆如此</title>
+<meta name="description" content="一款面向写作者与思考者的 AI 应用。在共鸣里看见自己，在异见里照见自己。" />
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#a8332a" />
+<link rel="icon" type="image/svg+xml" href="icon.svg" />
+<link rel="apple-touch-icon" href="icon.svg" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="行思" />
+<meta name="mobile-web-app-capable" content="yes" />
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
@@ -22,6 +34,7 @@
 <script type="text/babel" data-presets="env,react" src="src/shared.jsx"></script>
 <script type="text/babel" data-presets="env,react" src="src/tweaks-panel.jsx"></script>
 <script type="text/babel" data-presets="env,react" src="src/intro-card.jsx"></script>
+<script type="text/babel" data-presets="env,react" src="src/music-profile-panel.jsx"></script>
 <script type="text/babel" data-presets="env,react" src="src/screen-home.jsx"></script>
 <script type="text/babel" data-presets="env,react" src="src/screen-write.jsx"></script>
 <script type="text/babel" data-presets="env,react" src="src/screen-matching.jsx"></script>
@@ -30,5 +43,14 @@
 <script type="text/babel" data-presets="env,react" src="src/screen-cards.jsx"></script>
 <script type="text/babel" data-presets="env,react" src="src/screen-song.jsx"></script>
 <script type="text/babel" data-presets="env,react" src="src/app.jsx"></script>
+
+<!-- 注册 Service Worker（仅在 https 或 localhost 下生效） -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((e) => console.warn('[SW] 注册失败:', e));
+    });
+  }
+</script>
 </body>
 </html>
