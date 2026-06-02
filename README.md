@@ -51,28 +51,7 @@
 ---
 
 ## 🚀 快速开始
-
-由于使用浏览器端 Babel 转译 JSX，直接 `file://` 打开会被 CORS 拦截，需要本地起一个静态服务器：
-
-```bash
-# 方式一：Python 自带
-cd /path/to/xingsi
-python3 -m http.server 8765
-# 然后访问 http://localhost:8765/
-
-# 方式二：Node
-npx serve .
-
-# 方式三：VS Code Live Server 插件
-```
-
-首次进入会看到引导弹窗（缘起 / 架构设计 / 致谢三个 tab），关闭后从「新起一篇」开始写作。
-
-### 装到手机（PWA）
-1. 部署到 https 域名（Vercel / Netlify 一键导入 GitHub 仓库即可）
-2. 手机 Safari / Chrome 打开 → 分享 → 添加到主屏幕
-3. 桌面图标启动后是独立窗口，体感接近原生 App
-
+https://xingsi.vercel.app/
 ---
 
 ## 🔑 配置 API Key
@@ -83,11 +62,8 @@ npx serve .
 |---|---|---|
 | LLM1（匹配 / 标签） | 火山方舟 Doubao Responses API + web_search | [`src/data.jsx`](src/data.jsx) `getApiConfig('llm1')` |
 | LLM2（角色对话 / 写歌词 / 歌手分析 / 反思） | OpenAI 兼容 Chat Completions | [`src/data.jsx`](src/data.jsx) `getApiConfig('llm2')` |
-| 谱曲 | MiniMax music-2.6 | [`src/data.jsx`](src/data.jsx) `MINIMAX_API_KEY` |
+| LLM3 | MiniMax music-2.6 | [`src/data.jsx`](src/data.jsx) `MINIMAX_API_KEY` |
 
-⚠️ **不要把真实 Key 提交到公开仓库**。建议：
-- 公开仓库：把 Key 改为从 `localStorage` 读取（右上角"工具"面板支持运行时填入）
-- 私人原型：可保留硬编码，但将仓库设为 Private
 
 ---
 
