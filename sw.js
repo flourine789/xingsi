@@ -1,7 +1,10 @@
 // 行思 · Xing-Si — Service Worker
-// 改动了 app 文件后请把 CACHE_VERSION 加 1，强制更新
+// 版本号由 index.html 的 <meta name="app-build"> 注入到 sw.js?v= 查询参数
+// 更新发版时只需改 index.html 那一行 meta，浏览器会把"新 URL"视为新 SW
 
-const CACHE_VERSION = 'xingsi-v6';
+const BUILD = new URL(self.serviceWorker.scriptURL).searchParams.get('v') || 'dev';
+const CACHE_VERSION = `xingsi-${BUILD}`;
+
 const APP_SHELL = [
   './',
   './index.html',
@@ -56,9 +59,31 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('minimax') ||
     url.hostname.includes('openai.com') ||
     url.hostname.includes('anthropic.com');
-  if (isApi) return; // 不拦截，浏览器默认走网络
+  if (isApi) return;
 
-  // 静态资源：cache-first，后台静默更新
+  // 导航请求 / index.html：network-first
+  // 在线时永远拿到最新 meta（含 app-build），离线时回落到缓存
+  const isNavigation =
+    req.mode === 'navigate' ||
+    (url.origin === self.location.origin &&
+      (url.pathname.endsWith('/') || url.pathname.endsWith('/index.html')));
+
+  if (isNavigation) {
+    event.respondWith(
+      fetch(req)
+        .then((res) => {
+          if (res && res.status === 200) {
+            const copy = res.clone();
+            caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
+          }
+          return res;
+        })
+        .catch(() => caches.match(req).then((c) => c || caches.match('./index.html')))
+    );
+    return;
+  }
+
+  // 其余静态资源：cache-first，后台静默更新
   event.respondWith(
     caches.match(req).then((cached) => {
       const fetchAndUpdate = fetch(req)

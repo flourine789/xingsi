@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
 <title>行思 · Xing-Si — 古人今人若流水，共看明月皆如此</title>
 <meta name="description" content="一款面向写作者与思考者的 AI 应用。在共鸣里看见自己，在异见里照见自己。" />
+<meta name="app-build" content="2026-06-08-1" />
 
 <!-- PWA -->
 <link rel="manifest" href="manifest.json" />
@@ -48,7 +49,10 @@
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch((e) => console.warn('[SW] 注册失败:', e));
+      const build = document.querySelector('meta[name="app-build"]')?.content || 'dev';
+      navigator.serviceWorker
+        .register('sw.js?v=' + encodeURIComponent(build), { updateViaCache: 'none' })
+        .catch((e) => console.warn('[SW] 注册失败:', e));
     });
   }
 </script>
