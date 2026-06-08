@@ -636,6 +636,26 @@ function extractJson(raw) {
 
 
 /* ----------------------------------------------------------------
+   apiJoin — 智能拼接 baseUrl 与端点路径
+   若用户填的 baseUrl 已经带了端点后缀（如 /responses、/chat/completions），
+   则不再重复追加，避免 404。
+   ---------------------------------------------------------------- */
+window.apiJoin = function(base, path) {
+  let b = (base || '').replace(/\/+$/, '');
+  // 用户可能把完整端点 URL 当作 baseUrl 粘贴进来，先剥离已知后缀，再统一拼接
+  const KNOWN_SUFFIXES = ['/responses', '/chat/completions', '/music_generation'];
+  for (const suffix of KNOWN_SUFFIXES) {
+    if (b.toLowerCase().endsWith(suffix)) {
+      b = b.slice(0, -suffix.length);
+      break;
+    }
+  }
+  const p = path.startsWith('/') ? path : '/' + path;
+  return b + p;
+};
+
+
+/* ----------------------------------------------------------------
    getApiConfig — 代码内固定配置（忽略 localStorage）
    要改配置直接改这里。ApiPanel 的本地保存不再生效。
    which: 'llm1' | 'llm2' | undefined（返回全量）
@@ -728,9 +748,8 @@ window.callLLM1 = async function(essayText, opts) {
   opts = opts || {};
   const topN = opts.top_n || 9;
   const userContent = `随笔：\n${essayText}\n\n请找出最多 ${topN} 位回响者。务必先用 web_search 工具核实每条摘录的真实出处，再填写 source_url。`;
-  const base = cfg.baseUrl.replace(/\/$/, '');
 
-  const res = await fetch(`${base}/responses`, {
+  const res = await fetch(window.apiJoin(cfg.baseUrl, '/responses'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
     body: JSON.stringify({
@@ -818,10 +837,9 @@ window.factCheckCandidates = async function(candidates) {
     `${i}. 作者：${c.name}\n   摘录：${c.excerpt || '(空)'}\n   出处：${c.excerpt_source || '(空)'}`
   ).join('\n\n');
   const userContent = `请逐条核查以下 ${candidates.length} 条引文：\n\n${items}`;
-  const base = cfg.baseUrl.replace(/\/$/, '');
 
   try {
-    const res = await fetch(`${base}/chat/completions`, {
+    const res = await fetch(window.apiJoin(cfg.baseUrl, '/chat/completions'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
       body: JSON.stringify({
@@ -889,8 +907,7 @@ window.callLLM2 = async function(input) {
   const actionHint = input.action_prompt || actionDesc[input.action] || actionDesc.respond;
   msgs.push({ role: 'user', content: input.user_message ? `${input.user_message}\n\n（${actionHint}）` : actionHint });
 
-  const base = cfg.baseUrl.replace(/\/$/, '');
-  const res = await fetch(`${base}/chat/completions`, {
+  const res = await fetch(window.apiJoin(cfg.baseUrl, '/chat/completions'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
     body: JSON.stringify({ model: cfg.model, messages: msgs, temperature: 0.85, max_tokens: 600 })
@@ -1120,9 +1137,8 @@ window.generateLyrics = async function(essayText, tags) {
     : window.LYRICS_SP;
 
   const userContent = `随笔：\n${essayText}${tagDesc}\n\n请为它写一首歌的歌词与风格 prompt。`;
-  const base = cfg.baseUrl.replace(/\/$/, '');
 
-  const res = await fetch(`${base}/chat/completions`, {
+  const res = await fetch(window.apiJoin(cfg.baseUrl, '/chat/completions'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
     body: JSON.stringify({
@@ -1153,8 +1169,7 @@ window.callMiniMaxMusic = async function(lyrics, prompt) {
   if (!mm.apiKey) {
     throw new Error('未配置 MiniMax API Key。请在右下角"API"面板的 LLM3 标签填写。');
   }
-  const base = (mm.baseUrl || 'https://api.minimax.io/v1').replace(/\/$/, '');
-  const res = await fetch(`${base}/music_generation`, {
+  const res = await fetch(window.apiJoin(mm.baseUrl || 'https://api.minimax.io/v1', '/music_generation'), {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${mm.apiKey}`,
@@ -1278,8 +1293,7 @@ window.analyzeArtist = async function(name) {
   if (!cfg.enabled || !cfg.apiKey) {
     return `（未配置 API，跳过解析）喜欢 ${name} 的风格`;
   }
-  const base = cfg.baseUrl.replace(/\/$/, '');
-  const res = await fetch(`${base}/chat/completions`, {
+  const res = await fetch(window.apiJoin(cfg.baseUrl, '/chat/completions'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
     body: JSON.stringify({
@@ -1371,8 +1385,7 @@ ${recentText}
 请基于上述材料，更新这段自由补充。`;
 
   try {
-    const base = cfg.baseUrl.replace(/\/$/, '');
-    const res = await fetch(`${base}/chat/completions`, {
+    const res = await fetch(window.apiJoin(cfg.baseUrl, '/chat/completions'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
       body: JSON.stringify({
@@ -1428,11 +1441,10 @@ window.analyzeLyrics = async function(lyricsText, label) {
   if (!cfg.enabled || !cfg.apiKey) {
     return `（未配置 API，跳过解析）参考：${(label || '').slice(0, 30)}`;
   }
-  const base = cfg.baseUrl.replace(/\/$/, '');
   const userContent = label
     ? `用户喜欢这段歌词（标题：${label}）：\n\n${lyricsText}`
     : `用户喜欢这段歌词：\n\n${lyricsText}`;
-  const res = await fetch(`${base}/chat/completions`, {
+  const res = await fetch(window.apiJoin(cfg.baseUrl, '/chat/completions'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${cfg.apiKey}` },
     body: JSON.stringify({
